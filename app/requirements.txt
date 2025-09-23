@@ -1,0 +1,16 @@
+fastapi
+uvicorn[standard]
+minio
+sqlalchemy
+asyncpg
+alembic
+python-dotenv
+python-multipart
+aiofiles
+prometheus-client
+# Optional:
+loguru
+python-jose[cryptography]
+passlib[bcrypt]
+# Drop if unused:
+# psycopg2-binary

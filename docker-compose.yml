@@ -1,0 +1,102 @@
+services:
+  app1:
+    build: ./app
+    container_name: app1
+    restart: unless-stopped
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://postgres:postgres@db:5432/postgres
+      - MINIO_ENDPOINT=minio:9000
+      - MINIO_ACCESS_KEY=minioadmin
+      - MINIO_SECRET_KEY=minioadmin
+      - API_KEY=supersecretkey
+      - SERVER_NAME=app1
+    volumes:
+      - ./app:/app
+    depends_on:
+      - db
+      - minio
+
+  app2:
+    build: ./app
+    container_name: app2
+    restart: unless-stopped
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://postgres:postgres@db:5432/postgres
+      - MINIO_ENDPOINT=minio:9000
+      - MINIO_ACCESS_KEY=minioadmin
+      - MINIO_SECRET_KEY=minioadmin
+      - API_KEY=supersecretkey
+      - SERVER_NAME=app2
+    volumes:
+      - ./app:/app
+    depends_on:
+      - db
+      - minio
+
+  app3:
+    build: ./app
+    container_name: app3
+    restart: unless-stopped
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://postgres:postgres@db:5432/postgres
+      - MINIO_ENDPOINT=minio:9000
+      - MINIO_ACCESS_KEY=minioadmin
+      - MINIO_SECRET_KEY=minioadmin
+      - API_KEY=supersecretkey
+      - SERVER_NAME=app3
+    volumes:
+      - ./app:/app
+    depends_on:
+      - db
+      - minio
+
+  nginx:
+    image: nginx:latest
+    container_name: nginx
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+      - "8443:8443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/logs:/var/log/nginx
+      - ./nginx/certs/server.cert:/etc/nginx/certs/server.cert:ro
+      - ./nginx/certs/server.key:/etc/nginx/certs/server.key:ro
+    depends_on:
+      - app1
+      - app2
+      - app3
+
+  db:
+    image: postgres:14
+    container_name: db
+    restart: unless-stopped
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=postgres
+    volumes:
+      - db_data:/var/lib/postgresql/data
+      - ./db_init.sql:/docker-entrypoint-initdb.d/db_init.sql
+    ports:
+      - "5432:5432"
+
+  minio:
+    image: minio/minio:latest
+    container_name: minio
+    restart: unless-stopped
+    environment:
+      - MINIO_ROOT_USER=minioadmin
+      - MINIO_ROOT_PASSWORD=minioadmin
+    volumes:
+      - minio_data:/data
+      - ./minio/certs/public.cert:/root/.minio/certs/public.crt:ro
+      - ./minio/certs/private.key:/root/.minio/certs/private.key:ro
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    command: server /data --console-address ":9001"
+
+volumes:
+  db_data:
+  minio_data:
