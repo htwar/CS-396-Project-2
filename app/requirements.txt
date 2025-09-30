@@ -4,9 +4,12 @@ minio
 sqlalchemy
 asyncpg
 alembic
+asyncio
 python-dotenv
+gunicorn
 python-multipart
 aiofiles
+psutil
 prometheus-client
 # Optional:
 loguru

@@ -1,0 +1,49 @@
+# traefik/dynamic/api.yml
+http:
+  routers:
+    api:
+      rule: PathPrefix(`/v1`)
+      entryPoints: [websecure]
+      tls: {}
+      service: api-svc
+      middlewares: [cors]
+
+    health:
+      rule: Path(`/healthz`) || Path(`/metrics`)
+      entryPoints: [websecure]
+      tls: {}
+      service: api-svc
+      middlewares: [cors]
+
+  services:
+    api-svc:
+      loadBalancer:
+        passHostHeader: true
+        servers:
+          - url: http://app1:8000
+          - url: http://app2:8000
+          - url: http://app3:8000
+        healthCheck:
+          path: /healthz
+          scheme: http
+          interval: 5s
+          timeout: 2s
+
+  middlewares:
+    cors:
+      headers:
+        # Allow your Vite dev server origin
+        accessControlAllowOriginList:
+          - http://localhost:5173
+        accessControlAllowMethods:
+          - GET
+          - POST
+          - PUT
+          - DELETE
+          - OPTIONS
+        accessControlAllowHeaders:
+          - "*"
+          - X-Api-Key
+          - Admin-Key
+          - Idempotency-Key
+        addVaryHeader: true

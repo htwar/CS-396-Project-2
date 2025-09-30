@@ -1,0 +1,34 @@
+http:
+  middlewares:
+    retry-2:
+      retry:
+        attempts: 2
+        initialInterval: "100ms"
+    inflight-100:
+      inFlightReq:
+        amount: 100
+
+  routers:
+    files:
+      entryPoints: ["websecure"]
+      rule: >
+        PathPrefix(`/v1`) || Path(`/metrics`) || Path(`/healthz`) ||
+        Path(`/readyz`) || PathPrefix(`/docs`) || Path(`/openapi.json`)
+      service: "files-p2c"
+      tls: {}
+      middlewares:
+        - retry-2
+        - inflight-100
+
+  services:
+    files-p2c:
+      loadBalancer:
+        passHostHeader: true
+        healthCheck:
+          path: "/healthz"
+          interval: "5s"
+          timeout: "2s"
+        servers:
+          - url: "http://app1:8000"
+          - url: "http://app2:8000"
+          - url: "http://app3:8000"

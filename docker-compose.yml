@@ -1,75 +1,76 @@
 services:
-  app1:
-    build: ./app
-    container_name: app1
+  traefik:
+    image: traefik:v3.5.2
+    command:
+      - --providers.docker=true
+      - --providers.docker.exposedbydefault=false
+      - --providers.file.directory=/etc/traefik/dynamic
+      - --providers.file.watch=true
+      - --entrypoints.websecure.address=:8443
+      - --api.dashboard=true
+    ports:
+      - "8443:8443"
+      - "8080:8080"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./traefik/dynamic:/etc/traefik/dynamic:ro
+      - ./certs:/certs:ro
     restart: unless-stopped
-    environment:
-      - DATABASE_URL=postgresql+asyncpg://postgres:postgres@db:5432/postgres
-      - MINIO_ENDPOINT=minio:9000
-      - MINIO_ACCESS_KEY=minioadmin
-      - MINIO_SECRET_KEY=minioadmin
-      - API_KEY=supersecretkey
-      - SERVER_NAME=app1
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.traefik.rule=PathPrefix(`/dashboard`) || PathPrefix(`/api`)
+      - traefik.http.routers.traefik.entrypoints=websecure
+      - traefik.http.routers.traefik.tls=true
+      - traefik.http.routers.traefik.priority=1000
+      - traefik.http.routers.traefik.service=api@internal
+
+  app-base: &app
+    build: ./app
+    restart: unless-stopped
+    command: ["uvicorn","app_server:app","--host","0.0.0.0","--port","8000","--proxy-headers","--workers","2"]
+    environment: &app_env
+      DATABASE_URL: postgresql+asyncpg://postgres:postgres@db:5432/postgres
+      MINIO_ENDPOINT: minio:9000
+      MINIO_ACCESS_KEY: testadmin123
+      MINIO_SECRET_KEY: testadmin321
+      MINIO_SECURE: "true"
+      MINIO_SSE: "true"
+      API_KEY: supersecretkey
+      ADMIN_KEY: admin123
+      PORT: "8000"
+      WORKERS: "2"
+      # trust the self-signed MinIO cert inside the container
+      SSL_CERT_FILE: /certs/ca.crt
+      REQUESTS_CA_BUNDLE: /certs/ca.crt
+      CURL_CA_BUNDLE: /certs/ca.crt
     volumes:
       - ./app:/app
-    depends_on:
-      - db
-      - minio
+      - ./certs/server.cert:/certs/ca.crt:ro
+    depends_on: [db, minio]
+    expose: ["8000"]
+    labels:
+      - traefik.enable=false
+
+  app1:
+    <<: *app
+    environment:
+      <<: *app_env
+      SERVER_NAME: app1
 
   app2:
-    build: ./app
-    container_name: app2
-    restart: unless-stopped
+    <<: *app
     environment:
-      - DATABASE_URL=postgresql+asyncpg://postgres:postgres@db:5432/postgres
-      - MINIO_ENDPOINT=minio:9000
-      - MINIO_ACCESS_KEY=minioadmin
-      - MINIO_SECRET_KEY=minioadmin
-      - API_KEY=supersecretkey
-      - SERVER_NAME=app2
-    volumes:
-      - ./app:/app
-    depends_on:
-      - db
-      - minio
+      <<: *app_env
+      SERVER_NAME: app2
 
   app3:
-    build: ./app
-    container_name: app3
-    restart: unless-stopped
+    <<: *app
     environment:
-      - DATABASE_URL=postgresql+asyncpg://postgres:postgres@db:5432/postgres
-      - MINIO_ENDPOINT=minio:9000
-      - MINIO_ACCESS_KEY=minioadmin
-      - MINIO_SECRET_KEY=minioadmin
-      - API_KEY=supersecretkey
-      - SERVER_NAME=app3
-    volumes:
-      - ./app:/app
-    depends_on:
-      - db
-      - minio
-
-  nginx:
-    image: nginx:latest
-    container_name: nginx
-    restart: unless-stopped
-    ports:
-      - "8080:8080"
-      - "8443:8443"
-    volumes:
-      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
-      - ./nginx/logs:/var/log/nginx
-      - ./nginx/certs/server.cert:/etc/nginx/certs/server.cert:ro
-      - ./nginx/certs/server.key:/etc/nginx/certs/server.key:ro
-    depends_on:
-      - app1
-      - app2
-      - app3
+      <<: *app_env
+      SERVER_NAME: app3
 
   db:
     image: postgres:14
-    container_name: db
     restart: unless-stopped
     environment:
       - POSTGRES_USER=postgres
@@ -77,25 +78,33 @@ services:
       - POSTGRES_DB=postgres
     volumes:
       - db_data:/var/lib/postgresql/data
-      - ./db_init.sql:/docker-entrypoint-initdb.d/db_init.sql
+      - ./db_init.sql:/docker-entrypoint-initdb.d/db_initdb.sql
     ports:
       - "5432:5432"
 
   minio:
     image: minio/minio:latest
-    container_name: minio
     restart: unless-stopped
     environment:
-      - MINIO_ROOT_USER=minioadmin
-      - MINIO_ROOT_PASSWORD=minioadmin
+      MINIO_ROOT_USER: testadmin123
+      MINIO_ROOT_PASSWORD: testadmin321
+      MINIO_KMS_SECRET_KEY: "minio-default-key:RsSsTwmDFLZtcZLW1eaU3ID5viAAQdKtbmTfNvo4SRs="
+      MINIO_KMS_AUTO_ENCRYPTION: "on"
     volumes:
       - minio_data:/data
-      - ./minio/certs/public.cert:/root/.minio/certs/public.crt:ro
-      - ./minio/certs/private.key:/root/.minio/certs/private.key:ro
+      - ./certs/server.cert:/root/.minio/certs/public.crt:ro
+      - ./certs/server.key:/root/.minio/certs/private.key:ro
     ports:
       - "9000:9000"
       - "9001:9001"
     command: server /data --console-address ":9001"
+
+  prometheus:
+    image: prom/prometheus:v2.53.0
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    ports:
+      - "9090:9090"
 
 volumes:
   db_data:
