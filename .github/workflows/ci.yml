@@ -4,6 +4,10 @@ on:
   push:
     branches: [main]
 
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   backend:
     runs-on: ubuntu-latest
@@ -16,15 +20,14 @@ jobs:
         with:
           python-version: "3.12"
       - run: python -m pip install --upgrade pip
-      - run: pip install -r requirements.txt black ruff mypy pytest
+      - run: pip install -r requirements.txt black ruff mypy pytest types-psutil
       - run: black --check .
       - run: ruff check .
       - run: mypy .
-      # Don't fail the build if no tests are collected (pytest exit code 5)
       - name: pytest
         run: |
           set -e
-          pytest -q || code=$?
+          python -m pytest -q || code=$?
           if [ "${code:-0}" -eq 5 ]; then
             echo "pytest: no tests collected; continuing."; exit 0
           elif [ "${code:-0}" -ne 0 ]; then
@@ -41,3 +44,9 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "20"
+          cache: "npm"
+          cache-dependency-path: file-repo-ui/package-lock.json
+      - run: npm ci
+      - run: npm run lint --if-present
+      - run: npm test --if-present -- --run
+      - run: npm run build
