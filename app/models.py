@@ -25,6 +25,7 @@ class FileVersionModel(Base):
     size = Column(Integer)
     created_at = Column(TIMESTAMP(timezone=True), server_default=text("now()"))
 
+
 class UploadRequestModel(Base):
     __tablename__ = "upload_requests"
 
