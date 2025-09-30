@@ -29,24 +29,22 @@ jobs:
       - name: Setup Buildx
         uses: docker/setup-buildx-action@v3
 
-      # Backend image (multi-arch)
-      - name: Build & push backend
+      - name: Build & push backend (multi-arch)
         uses: docker/build-push-action@v6
         with:
-          context: ./app                     # <- fixed
-          file: ./app/Dockerfile             # <- fixed
+          context: ./app
+          file: ./app/Dockerfile
           push: true
           tags: |
             ${{ env.IMAGE_APP }}:${{ env.TAG }}
             ${{ env.IMAGE_APP }}:main
-          platforms: linux/amd64,linux/arm64 # good for Mac + x86 server
+          platforms: linux/amd64,linux/arm64
 
-      # Frontend image (multi-arch)
-      - name: Build & push frontend
+      - name: Build & push frontend (multi-arch)
         uses: docker/build-push-action@v6
         with:
-          context: ./file-repo-ui            # <- fixed
-          file: ./file-repo-ui/Dockerfile    # <- fixed
+          context: ./file-repo-ui
+          file: ./file-repo-ui/Dockerfile
           push: true
           tags: |
             ${{ env.IMAGE_UI }}:${{ env.TAG }}
@@ -77,7 +75,7 @@ jobs:
           script: |
             set -euo pipefail
             cd ~/file-repo
-            export APP_TAG=${{ env.TAG }}   # <- deploy the exact commit
+            export APP_TAG=${{ env.TAG }}
             docker compose -f docker-compose.yml -f docker-compose.prod.yml pull
             docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
             for i in {1..30}; do
